@@ -1,4 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface AnalyticsData {
   customerStats: Array<{
@@ -11,6 +33,28 @@ interface AnalyticsData {
     total_closed_tickets: number;
   };
 }
+
+const AnimatedCounter = ({ value, duration = 2000 }: { value: number; duration?: number }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTime: number;
+    const animateCount = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const currentCount = Math.floor(progress * value);
+      setCount(currentCount);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animateCount);
+      }
+    };
+    
+    requestAnimationFrame(animateCount);
+  }, [value, duration]);
+
+  return <span>{count}</span>;
+};
 
 const AnalyticsView: React.FC = () => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -87,144 +131,269 @@ const AnalyticsView: React.FC = () => {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded mb-4"></div>
-          <div className="grid grid-cols-2 gap-6">
-            <div className="h-80 bg-gray-200 rounded"></div>
-            <div className="h-80 bg-gray-200 rounded"></div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="space-y-6"
+        >
+          <div className="glass p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 bg-white/10 rounded mb-4"></div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="h-80 bg-white/5 rounded-xl"></div>
+                <div className="h-80 bg-white/5 rounded-xl"></div>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
   const totalTickets = analytics?.statusSummary.total_open_tickets + analytics?.statusSummary.total_closed_tickets;
 
-  return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Analytics & Reports</h2>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Ticket Status Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Ticket Status Overview</h3>
-          
-          {analytics && (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-600">Open Tickets</span>
-                <span className="text-sm font-bold text-orange-600">
-                  {analytics.statusSummary.total_open_tickets}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-orange-600 h-2 rounded-full"
-                  style={{
-                    width: `${totalTickets ? (analytics.statusSummary.total_open_tickets / totalTickets) * 100 : 0}%`
-                  }}
-                ></div>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-600">Closed Tickets</span>
-                <span className="text-sm font-bold text-green-600">
-                  {analytics.statusSummary.total_closed_tickets}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full"
-                  style={{
-                    width: `${totalTickets ? (analytics.statusSummary.total_closed_tickets / totalTickets) * 100 : 0}%`
-                  }}
-                ></div>
-              </div>
-              
-              <div className="mt-4 p-3 bg-gray-50 rounded">
-                <div className="text-sm text-gray-600">
-                  <strong>Total Tickets:</strong> {totalTickets}
-                </div>
-                <div className="text-sm text-gray-600">
-                  <strong>Resolution Rate:</strong> {totalTickets ? Math.round((analytics.statusSummary.total_closed_tickets / totalTickets) * 100) : 0}%
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+  // Chart data
+  const doughnutData = {
+    labels: ['Open Tickets', 'Closed Tickets'],
+    datasets: [{
+      data: [analytics?.statusSummary.total_open_tickets || 0, analytics?.statusSummary.total_closed_tickets || 0],
+      backgroundColor: [
+        'rgba(249, 115, 22, 0.8)',
+        'rgba(34, 197, 94, 0.8)',
+      ],
+      borderColor: [
+        'rgba(249, 115, 22, 1)',
+        'rgba(34, 197, 94, 1)',
+      ],
+      borderWidth: 2,
+    }]
+  };
 
-        {/* Customer Activity Chart */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Customers by Tickets</h3>
+  const barData = {
+    labels: analytics?.customerStats.slice(0, 6).map(c => c.customer.split(' ')[0]) || [],
+    datasets: [{
+      label: 'Tickets',
+      data: analytics?.customerStats.slice(0, 6).map(c => c.ticket_count) || [],
+      backgroundColor: 'rgba(79, 70, 229, 0.8)',
+      borderColor: 'rgba(79, 70, 229, 1)',
+      borderWidth: 2,
+      borderRadius: 8,
+    }]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: '#f1f5f9',
+          font: {
+            size: 12
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        titleColor: '#f1f5f9',
+        bodyColor: '#cbd5e1',
+        borderColor: 'rgba(79, 70, 229, 0.5)',
+        borderWidth: 1,
+      }
+    },
+    scales: {
+      y: {
+        ticks: {
+          color: '#94a3b8'
+        },
+        grid: {
+          color: 'rgba(148, 163, 184, 0.1)'
+        }
+      },
+      x: {
+        ticks: {
+          color: '#94a3b8'
+        },
+        grid: {
+          color: 'rgba(148, 163, 184, 0.1)'
+        }
+      }
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-6 space-y-6"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass p-6"
+      >
+        <h2 className="text-3xl font-bold gradient-text mb-2">Analytics & Reports</h2>
+        <p className="text-gray-300 text-sm">Real-time insights and performance metrics</p>
+      </motion.div>
+      
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {[
+          { 
+            label: 'Total Customers', 
+            value: analytics?.statusSummary.total_customers || 0, 
+            icon: '👥', 
+            color: 'from-blue-500 to-cyan-500',
+            bgColor: 'bg-blue-500/10 border-blue-500/30'
+          },
+          { 
+            label: 'Open Tickets', 
+            value: analytics?.statusSummary.total_open_tickets || 0, 
+            icon: '🎫', 
+            color: 'from-orange-500 to-red-500',
+            bgColor: 'bg-orange-500/10 border-orange-500/30'
+          },
+          { 
+            label: 'Closed Tickets', 
+            value: analytics?.statusSummary.total_closed_tickets || 0, 
+            icon: '✅', 
+            color: 'from-green-500 to-emerald-500',
+            bgColor: 'bg-green-500/10 border-green-500/30'
+          },
+          { 
+            label: 'Resolution Rate', 
+            value: totalTickets ? Math.round((analytics?.statusSummary.total_closed_tickets / totalTickets) * 100) : 0, 
+            icon: '📊', 
+            color: 'from-purple-500 to-pink-500',
+            bgColor: 'bg-purple-500/10 border-purple-500/30',
+            suffix: '%'
+          }
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 }}
+            className={`glass-strong p-6 border ${stat.bgColor} glow-purple`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-2xl">{stat.icon}</span>
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${stat.color} flex items-center justify-center opacity-20`}></div>
+            </div>
+            <div className="space-y-1">
+              <div className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
+                <AnimatedCounter value={stat.value} />
+                {stat.suffix}
+              </div>
+              <div className="text-sm text-gray-300">{stat.label}</div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Ticket Status Doughnut Chart */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass-strong p-6 glow"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center">
+            <span className="mr-2">📊</span>
+            Ticket Status Distribution
+          </h3>
+          <div className="h-64 flex items-center justify-center">
+            {analytics && <Doughnut data={doughnutData} options={chartOptions} />}
+          </div>
+        </motion.div>
+
+        {/* Customer Activity Bar Chart */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+          className="glass-strong p-6 glow"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center">
+            <span className="mr-2">📈</span>
+            Top Customers Activity
+          </h3>
+          <div className="h-64">
+            {analytics && <Bar data={barData} options={chartOptions} />}
+          </div>
+        </motion.div>
+
+        {/* Customer Rankings */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass-strong p-6 lg:col-span-2 glow-purple"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center">
+            <span className="mr-2">🏆</span>
+            Customer Activity Rankings
+          </h3>
           
           {analytics && (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {analytics.customerStats.slice(0, 8).map((customer, index) => (
-                <div key={customer.customer} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                      index < 3 ? 'bg-blue-500' : 'bg-gray-400'
-                    }`}>
-                      {index + 1}
+                <motion.div
+                  key={customer.customer}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 + (index * 0.05) }}
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-all duration-200"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.7 + (index * 0.05), type: "spring" }}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white ${
+                          index === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
+                          index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-500' :
+                          index === 2 ? 'bg-gradient-to-r from-amber-600 to-yellow-700' :
+                          'bg-gradient-to-r from-indigo-500 to-purple-600'
+                        }`}
+                      >
+                        {index + 1}
+                      </motion.div>
+                      <div>
+                        <div className="text-sm font-medium text-white truncate">
+                          {customer.customer}
+                        </div>
+                        <div className="text-xs text-gray-400">Customer</div>
+                      </div>
                     </div>
-                    <span className="text-sm font-medium text-gray-700 truncate">
-                      {customer.customer}
-                    </span>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-indigo-400">
+                        <AnimatedCounter value={customer.ticket_count} duration={1500} />
+                      </div>
+                      <div className="text-xs text-gray-400">tickets</div>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-20 bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full"
-                        style={{
-                          width: `${analytics.customerStats[0]?.ticket_count ? (customer.ticket_count / analytics.customerStats[0].ticket_count) * 100 : 0}%`
+                  <div className="mt-3">
+                    <div className="w-full bg-white/10 rounded-full h-2">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ 
+                          width: `${analytics.customerStats[0]?.ticket_count ? (customer.ticket_count / analytics.customerStats[0].ticket_count) * 100 : 0}%` 
                         }}
-                      ></div>
+                        transition={{ delay: 0.8 + (index * 0.05), duration: 1 }}
+                        className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full"
+                      />
                     </div>
-                    <span className="text-sm font-bold text-gray-800 w-6 text-right">
-                      {customer.ticket_count}
-                    </span>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           )}
-        </div>
-
-        {/* Summary Statistics */}
-        <div className="bg-white p-6 rounded-lg shadow-md lg:col-span-2">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Summary Statistics</h3>
-          
-          {analytics && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {analytics.statusSummary.total_customers}
-                </div>
-                <div className="text-sm text-blue-800">Total Customers</div>
-              </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">
-                  {analytics.statusSummary.total_open_tickets}
-                </div>
-                <div className="text-sm text-orange-800">Open Tickets</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {analytics.statusSummary.total_closed_tickets}
-                </div>
-                <div className="text-sm text-green-800">Closed Tickets</div>
-              </div>
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold text-gray-600">
-                  {totalTickets ? (analytics.statusSummary.total_open_tickets / analytics.statusSummary.total_customers).toFixed(1) : '0.0'}
-                </div>
-                <div className="text-sm text-gray-800">Avg Open/Customer</div>
-              </div>
-            </div>
-          )}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 

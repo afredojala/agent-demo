@@ -1,27 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Message {
   id: string;
-  type: 'user' | 'agent' | 'system';
+  type: 'user' | 'agent' | 'system' | 'tool';
   content: string;
   timestamp: string;
+  toolCall?: string;
+  isTyping?: boolean;
 }
 
 interface ChatInterfaceProps {
   onViewChange: (view: string) => void;
 }
 
+const TypingAnimation = ({ text, onComplete }: { text: string; onComplete: () => void }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    if (!text) return;
+    
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < text.length) {
+        setDisplayedText(text.slice(0, i + 1));
+        i++;
+      } else {
+        setIsComplete(true);
+        clearInterval(timer);
+        setTimeout(onComplete, 500);
+      }
+    }, 30);
+
+    return () => clearInterval(timer);
+  }, [text, onComplete]);
+
+  return (
+    <span>
+      {displayedText}
+      {!isComplete && <span className="animate-pulse">|</span>}
+    </span>
+  );
+};
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       type: 'system',
-      content: 'Agent ready. Ask me to help with customer tasks!',
+      content: '🤖 Agent ready. Ask me to help with customer tasks!',
       timestamp: new Date().toISOString()
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [toolExecutions, setToolExecutions] = useState<string[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, toolExecutions]);
+
+  const simulateToolExecution = async (tools: string[]) => {
+    for (const tool of tools) {
+      setToolExecutions(prev => [...prev, tool]);
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -34,8 +84,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const userInput = input.trim();
     setInput('');
     setIsLoading(true);
+    setToolExecutions([]);
+
+    // Simulate tool execution visualization
+    const mockTools = [
+      '🔍 Searching customers...',
+      '📊 Analyzing data...',
+      '🎯 Switching view...'
+    ];
+    
+    setTimeout(() => simulateToolExecution(mockTools), 500);
 
     try {
       const response = await fetch('http://localhost:8000/api/chat', {
@@ -43,38 +104,52 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: input.trim() }),
+        body: JSON.stringify({ message: userInput }),
       });
 
       if (!response.ok) throw new Error('Failed to send message');
       
       const data = await response.json();
 
-      const agentMessage: Message = {
+      // Clear tool executions
+      setToolExecutions([]);
+
+      // Add typing message first
+      const typingMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'agent',
         content: data.response,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isTyping: true
       };
 
-      setMessages(prev => [...prev, agentMessage]);
+      setMessages(prev => [...prev, typingMessage]);
 
       // Handle view changes based on agent response
       if (data.view_change) {
-        onViewChange(data.view_change);
+        setTimeout(() => onViewChange(data.view_change), 1000);
       }
 
     } catch (error) {
+      setToolExecutions([]);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'system',
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleTypingComplete = (messageId: string) => {
+    setMessages(prev => 
+      prev.map(msg => 
+        msg.id === messageId ? { ...msg, isTyping: false } : msg
+      )
+    );
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -84,133 +159,169 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
     }
   };
 
+  const quickActions = [
+    { text: "Show me Acme's open tickets", color: 'blue', icon: '🎫' },
+    { text: "Generate a daily summary report", color: 'green', icon: '📊' },
+    { text: "Show customer analytics", color: 'purple', icon: '📈' },
+    { text: "Find high activity customers", color: 'orange', icon: '🔥' },
+    { text: "Show customer health report", color: 'teal', icon: '💚' },
+    { text: "Close resolved tickets", color: 'gray', icon: '✅' },
+    { text: "Onboard TechCorp as a new customer", color: 'purple', icon: '🚀', special: true },
+    { text: "Run ticket escalation workflow", color: 'red', icon: '🚨', special: true },
+    { text: "Generate weekly business report", color: 'blue', icon: '📊', special: true },
+    { text: "Run customer health check workflow", color: 'green', icon: '💚', special: true }
+  ];
+
   return (
-    <div className="bg-white rounded-lg shadow-lg flex flex-col h-96">
-      <div className="p-3 border-b bg-gray-50 rounded-t-lg">
-        <h3 className="font-semibold text-gray-800">Agent Chat</h3>
-        <p className="text-xs text-gray-600">Ask me to help with customer tasks!</p>
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="glass-strong flex flex-col h-[600px] glow"
+    >
+      {/* Header */}
+      <div className="p-4 border-b border-white/10">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
+            <span className="text-white text-sm font-bold">AI</span>
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Agent Assistant</h3>
+            <p className="text-xs text-gray-300">Powered by AI • Ready to help</p>
+          </div>
+          <div className="ml-auto">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          </div>
+        </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {messages.map(message => (
-          <div
-            key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg text-sm ${
-                message.type === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : message.type === 'agent'
-                  ? 'bg-gray-200 text-gray-800'
-                  : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-              }`}
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <AnimatePresence>
+          {messages.map((message, index) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ delay: index * 0.1 }}
+              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
-              <div>{message.content}</div>
-              <div className={`text-xs mt-1 ${
-                message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
-              }`}>
-                {new Date(message.timestamp).toLocaleTimeString()}
+              <div
+                className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm backdrop-blur-sm ${
+                  message.type === 'user'
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white'
+                    : message.type === 'agent'
+                    ? 'bg-white/10 border border-white/20 text-gray-100'
+                    : 'bg-amber-500/20 border border-amber-400/30 text-amber-200'
+                }`}
+              >
+                <div className="font-medium">
+                  {message.isTyping ? (
+                    <TypingAnimation 
+                      text={message.content} 
+                      onComplete={() => handleTypingComplete(message.id)}
+                    />
+                  ) : (
+                    message.content
+                  )}
+                </div>
+                <div className={`text-xs mt-2 opacity-70 ${
+                  message.type === 'user' ? 'text-white' : 'text-gray-300'
+                }`}>
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Tool Execution Visualization */}
+        <AnimatePresence>
+          {toolExecutions.map((tool, index) => (
+            <motion.div
+              key={`tool-${index}`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="flex justify-start"
+            >
+              <div className="bg-blue-500/20 border border-blue-400/30 px-4 py-2 rounded-xl text-sm text-blue-300 flex items-center space-x-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <span>{tool}</span>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Loading indicator */}
+        {isLoading && toolExecutions.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex justify-start"
+          >
+            <div className="bg-white/10 border border-white/20 px-4 py-3 rounded-2xl text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                </div>
+                <span className="text-gray-300">Agent thinking...</span>
               </div>
             </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-200 text-gray-800 px-3 py-2 rounded-lg text-sm">
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-              </div>
-            </div>
-          </div>
+          </motion.div>
         )}
+        <div ref={messagesEndRef} />
       </div>
       
-      <div className="p-3 border-t">
-        <div className="flex space-x-2">
+      {/* Input Area */}
+      <div className="p-4 border-t border-white/10">
+        <div className="flex space-x-3 mb-3">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask me to help with customers..."
-            className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            className="flex-1 px-4 py-3 bg-white/5 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm text-white placeholder-gray-400 backdrop-blur-sm"
             disabled={isLoading}
           />
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            className="px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium btn-glow transition-all duration-200"
           >
-            Send
-          </button>
+            {isLoading ? '⚡' : '→'}
+          </motion.button>
         </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            onClick={() => setInput("Show me Acme's open tickets")}
-            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
-          >
-            Show Acme tickets
-          </button>
-          <button
-            onClick={() => setInput("Generate a daily summary report")}
-            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
-          >
-            Daily report
-          </button>
-          <button
-            onClick={() => setInput("Show customer analytics")}
-            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
-          >
-            Analytics
-          </button>
-          <button
-            onClick={() => setInput("Find high activity customers")}
-            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
-          >
-            High activity
-          </button>
-          <button
-            onClick={() => setInput("Show customer health report")}
-            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
-          >
-            Health report
-          </button>
-          <button
-            onClick={() => setInput("Close resolved tickets")}
-            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
-          >
-            Close tickets
-          </button>
-          <button
-            onClick={() => setInput("Onboard TechCorp as a new customer")}
-            className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200"
-          >
-            🚀 Onboard Customer
-          </button>
-          <button
-            onClick={() => setInput("Run ticket escalation workflow")}
-            className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-          >
-            🚨 Escalate Tickets
-          </button>
-          <button
-            onClick={() => setInput("Generate weekly business report")}
-            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
-          >
-            📊 Weekly Report
-          </button>
-          <button
-            onClick={() => setInput("Run customer health check workflow")}
-            className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
-          >
-            💚 Health Check
-          </button>
+        
+        {/* Quick Actions */}
+        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+          {quickActions.map((action, index) => (
+            <motion.button
+              key={index}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.05 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setInput(action.text)}
+              className={`px-3 py-1.5 rounded-lg text-xs transition-all duration-200 ${
+                action.special 
+                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30 text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30'
+                  : 'bg-white/5 border border-white/20 text-gray-300 hover:bg-white/10'
+              } backdrop-blur-sm`}
+            >
+              <span className="mr-1">{action.icon}</span>
+              {action.text.length > 20 ? action.text.substring(0, 20) + '...' : action.text}
+            </motion.button>
+          ))}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
