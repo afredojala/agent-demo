@@ -14,6 +14,17 @@ from agent.tools import (
     create_note,
     send_email,
     emit_intent,
+    get_customer_stats,
+    bulk_update_tickets,
+    generate_report,
+    execute_workflow,
+    workflow_decision,
+    set_workflow_state,
+    get_workflow_state,
+    create_customer,
+    schedule_followup,
+    check_sla_status,
+    assign_ticket,
 )
 
 
@@ -29,6 +40,28 @@ def call_tool(name: str, args: dict):
         return send_email(**args)
     elif name == "tool_emit_view_intent":
         return asyncio.run(emit_intent(args))
+    elif name == "tool_get_customer_stats":
+        return get_customer_stats(**args)
+    elif name == "tool_bulk_update_tickets":
+        return bulk_update_tickets(**args)
+    elif name == "tool_generate_report":
+        return generate_report(**args)
+    elif name == "tool_execute_workflow":
+        return execute_workflow(**args)
+    elif name == "tool_workflow_decision":
+        return workflow_decision(**args)
+    elif name == "tool_set_workflow_state":
+        return set_workflow_state(**args)
+    elif name == "tool_get_workflow_state":
+        return get_workflow_state(**args)
+    elif name == "tool_create_customer":
+        return create_customer(**args)
+    elif name == "tool_schedule_followup":
+        return schedule_followup(**args)
+    elif name == "tool_check_sla_status":
+        return check_sla_status(**args)
+    elif name == "tool_assign_ticket":
+        return assign_ticket(**args)
     else:
         raise ValueError(f"Unknown tool {name}")
 
@@ -38,7 +71,35 @@ def run_task(user_goal: str) -> str:
     messages = [
         {
             "role": "system",
-            "content": "You are an operations agent that completes tasks using tools and controls the app's views via view-intents. Always start by setting appropriate views for the task.",
+            "content": """You are an operations agent for a mini-CRM system. You help users manage customers, tickets, and execute complex business workflows.
+
+Available capabilities:
+- Search and manage customers
+- View and manage support tickets  
+- Create notes on tickets
+- Send emails (mock)
+- Generate analytics and reports
+- Perform bulk operations on tickets
+- Execute multi-step workflows with decision points
+- Control UI views (triage, customer-list, dashboard, analytics, timeline, calendar)
+
+WORKFLOWS: You can execute sophisticated business processes:
+- customer_onboarding: Full onboarding with premium/standard paths
+- ticket_escalation: SLA checking with escalation decisions  
+- weekly_report: Comprehensive reporting with trend analysis
+- customer_health_check: Proactive customer health monitoring
+
+For UI control, always use view intents to show relevant views:
+- "triage" for ticket management
+- "customer-list" for customer browsing  
+- "dashboard" for overview/summary
+- "analytics" for statistics and reports
+- "timeline" for chronological views
+- "calendar" for scheduled items
+
+WORKFLOW EXECUTION: When users request complex processes like "onboard a customer", "run escalation workflow", or "generate weekly report", use the execute_workflow tool. These workflows include decision points and branching logic.
+
+Always start by setting an appropriate view, then execute the requested task. For workflows, explain each step as you progress. Be conversational and show your decision-making process.""",
         },
         {"role": "user", "content": user_goal},
     ]

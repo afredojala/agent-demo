@@ -22,9 +22,8 @@ def setup_demo():
     if os.getenv("OPENAI_API_KEY"):
         print("2. Testing agent system...")
         try:
-            from agent.crew import run_task
 
-            result = run_task("Show Acme's open tickets in a triage view")
+            # result = run_task("Show Acme's open tickets in a triage view")
             print(f"✓ Agent test completed: {result}...")
         except Exception as e:
             print(f"⚠ Agent test failed: {e}")

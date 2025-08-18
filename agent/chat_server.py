@@ -29,16 +29,33 @@ async def process_message(request: ChatRequest) -> ChatResponse:
         # Run the task using the agent
         result = run_task(request.message)
 
-        # Determine view change based on the message content
+        # Determine view change based on message content and agent response
         view_change = None
         msg_lower = request.message.lower()
+        result_lower = result.lower()
 
-        if "triage" in msg_lower or ("acme" in msg_lower and "ticket" in msg_lower):
-            view_change = "triage"
-        elif "customer" in msg_lower and "list" in msg_lower:
-            view_change = "customer-list"
-        elif "detail" in msg_lower:
-            view_change = "customer-detail"
+        # Check agent response for explicit view mentions
+        if "view:" in result_lower:
+            view_parts = result_lower.split("view:")
+            if len(view_parts) > 1:
+                view_change = view_parts[1].split()[0].strip()
+        
+        # Fallback to message-based view detection
+        if not view_change:
+            if "workflow" in msg_lower or ("onboard" in msg_lower or "escalation" in msg_lower or any(word in msg_lower for word in ["run", "execute"]) and any(word in msg_lower for word in ["workflow", "process"])):
+                view_change = "workflow"
+            elif "triage" in msg_lower or ("ticket" in msg_lower and any(word in msg_lower for word in ["show", "view", "display"])):
+                view_change = "triage"
+            elif "analytics" in msg_lower or "report" in msg_lower or "stats" in msg_lower:
+                view_change = "analytics"
+            elif "dashboard" in msg_lower or "summary" in msg_lower or "overview" in msg_lower:
+                view_change = "dashboard"
+            elif "customer" in msg_lower and any(word in msg_lower for word in ["list", "show", "browse"]):
+                view_change = "customer-list"
+            elif "timeline" in msg_lower:
+                view_change = "timeline"
+            elif "calendar" in msg_lower:
+                view_change = "calendar"
 
         return ChatResponse(response=result, view_change=view_change)
 

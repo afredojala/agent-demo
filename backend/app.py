@@ -169,6 +169,187 @@ async def chat(message: ChatMessage):
         return ChatResponse(response=response_text, view_change=view_change)
 
 
+@app.get("/team", response_model=List[dict])
+def list_team_members():
+    conn = db()
+    return rows(conn, "SELECT * FROM team_members WHERE active = 1 ORDER BY name")
+
+
+@app.get("/customers/{customer_id}/interactions", response_model=List[dict])
+def get_customer_interactions(customer_id: str):
+    conn = db()
+    return rows(
+        conn,
+        "SELECT * FROM interactions WHERE customer_id = ? ORDER BY created_at DESC",
+        (customer_id,)
+    )
+
+
+@app.get("/tickets/{ticket_id}/notes", response_model=List[dict])
+def get_ticket_notes(ticket_id: str):
+    conn = db()
+    return rows(
+        conn,
+        "SELECT * FROM notes WHERE ticket_id = ? ORDER BY created_at ASC",
+        (ticket_id,)
+    )
+
+
+@app.get("/analytics/summary")
+def get_analytics_summary():
+    conn = db()
+    
+    # Customer metrics
+    customer_metrics = rows(conn, """
+        SELECT 
+            COUNT(*) as total_customers,
+            AVG(health_score) as avg_health_score,
+            SUM(mrr) as total_mrr,
+            COUNT(CASE WHEN lifecycle_stage = 'trial' THEN 1 END) as trial_customers,
+            COUNT(CASE WHEN lifecycle_stage = 'customer' THEN 1 END) as paying_customers,
+            COUNT(CASE WHEN lifecycle_stage = 'churn_risk' THEN 1 END) as churn_risk_customers
+        FROM customers
+    """)[0]
+    
+    # Ticket metrics
+    ticket_metrics = rows(conn, """
+        SELECT 
+            COUNT(*) as total_tickets,
+            COUNT(CASE WHEN status = 'open' THEN 1 END) as open_tickets,
+            COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_tickets,
+            COUNT(CASE WHEN priority = 'critical' THEN 1 END) as critical_tickets,
+            COUNT(CASE WHEN sla_breach = 1 THEN 1 END) as sla_breaches,
+            AVG(satisfaction_rating) as avg_satisfaction
+        FROM tickets
+    """)[0]
+    
+    # Recent activity
+    recent_tickets = rows(conn, """
+        SELECT t.*, c.name as customer_name 
+        FROM tickets t 
+        JOIN customers c ON t.customer_id = c.id 
+        ORDER BY t.created_at DESC 
+        LIMIT 10
+    """)
+    
+    # Customer health distribution
+    health_distribution = rows(conn, """
+        SELECT 
+            CASE 
+                WHEN health_score >= 90 THEN 'Excellent'
+                WHEN health_score >= 75 THEN 'Good'
+                WHEN health_score >= 60 THEN 'Fair'
+                ELSE 'Poor'
+            END as health_category,
+            COUNT(*) as count
+        FROM customers
+        GROUP BY health_category
+    """)
+    
+    return {
+        "customers": customer_metrics,
+        "tickets": ticket_metrics,
+        "recent_activity": recent_tickets,
+        "health_distribution": health_distribution,
+        "generated_at": "now"
+    }
+
+
+@app.get("/analytics/revenue")
+def get_revenue_analytics():
+    conn = db()
+    
+    # Revenue by plan type
+    revenue_by_plan = rows(conn, """
+        SELECT 
+            plan_type,
+            COUNT(*) as customer_count,
+            SUM(mrr) as total_mrr,
+            AVG(mrr) as avg_mrr
+        FROM customers 
+        WHERE lifecycle_stage = 'customer'
+        GROUP BY plan_type
+        ORDER BY total_mrr DESC
+    """)
+    
+    # Revenue by region
+    revenue_by_region = rows(conn, """
+        SELECT 
+            region,
+            COUNT(*) as customer_count,
+            SUM(mrr) as total_mrr
+        FROM customers 
+        WHERE lifecycle_stage = 'customer'
+        GROUP BY region
+        ORDER BY total_mrr DESC
+    """)
+    
+    # Industry analysis
+    industry_analysis = rows(conn, """
+        SELECT 
+            industry,
+            COUNT(*) as customer_count,
+            SUM(mrr) as total_mrr,
+            AVG(health_score) as avg_health_score
+        FROM customers 
+        WHERE lifecycle_stage = 'customer'
+        GROUP BY industry
+        ORDER BY total_mrr DESC
+    """)
+    
+    return {
+        "revenue_by_plan": revenue_by_plan,
+        "revenue_by_region": revenue_by_region, 
+        "industry_analysis": industry_analysis
+    }
+
+
+@app.get("/analytics/support")
+def get_support_analytics():
+    conn = db()
+    
+    # Tickets by priority and status
+    ticket_matrix = rows(conn, """
+        SELECT 
+            priority,
+            status,
+            COUNT(*) as count
+        FROM tickets
+        GROUP BY priority, status
+        ORDER BY priority, status
+    """)
+    
+    # Team performance
+    team_performance = rows(conn, """
+        SELECT 
+            tm.name,
+            tm.role,
+            COUNT(t.id) as assigned_tickets,
+            COUNT(CASE WHEN t.status = 'resolved' THEN 1 END) as resolved_tickets,
+            AVG(t.satisfaction_rating) as avg_rating
+        FROM team_members tm
+        LEFT JOIN tickets t ON tm.id = t.assigned_to
+        WHERE tm.active = 1
+        GROUP BY tm.id, tm.name, tm.role
+        ORDER BY assigned_tickets DESC
+    """)
+    
+    # SLA compliance
+    sla_compliance = rows(conn, """
+        SELECT 
+            COUNT(*) as total_tickets,
+            COUNT(CASE WHEN sla_breach = 0 THEN 1 END) as compliant_tickets,
+            ROUND(COUNT(CASE WHEN sla_breach = 0 THEN 1 END) * 100.0 / COUNT(*), 2) as compliance_rate
+        FROM tickets
+    """)[0]
+    
+    return {
+        "ticket_matrix": ticket_matrix,
+        "team_performance": team_performance,
+        "sla_compliance": sla_compliance
+    }
+
+
 @app.get("/healthz")
 def healthz():
     return {"ok": True}

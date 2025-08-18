@@ -155,16 +155,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
             Show Acme tickets
           </button>
           <button
-            onClick={() => setInput("Add a note to ticket_1")}
+            onClick={() => setInput("Generate a daily summary report")}
             className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
           >
-            Add note
+            Daily report
           </button>
           <button
-            onClick={() => setInput("Email me a summary")}
+            onClick={() => setInput("Show customer analytics")}
             className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
           >
-            Email summary
+            Analytics
+          </button>
+          <button
+            onClick={() => setInput("Find high activity customers")}
+            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
+          >
+            High activity
+          </button>
+          <button
+            onClick={() => setInput("Show customer health report")}
+            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
+          >
+            Health report
+          </button>
+          <button
+            onClick={() => setInput("Close resolved tickets")}
+            className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200"
+          >
+            Close tickets
+          </button>
+          <button
+            onClick={() => setInput("Onboard TechCorp as a new customer")}
+            className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200"
+          >
+            🚀 Onboard Customer
+          </button>
+          <button
+            onClick={() => setInput("Run ticket escalation workflow")}
+            className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+          >
+            🚨 Escalate Tickets
+          </button>
+          <button
+            onClick={() => setInput("Generate weekly business report")}
+            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+          >
+            📊 Weekly Report
+          </button>
+          <button
+            onClick={() => setInput("Run customer health check workflow")}
+            className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
+          >
+            💚 Health Check
           </button>
         </div>
       </div>

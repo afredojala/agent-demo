@@ -1,14 +1,19 @@
 export type ViewIntent =
-  | { type: "set_view"; view_id: "customer-list" | "customer-detail" | "triage" }
+  | { type: "set_view"; view_id: "customer-list" | "customer-detail" | "triage" | "dashboard" | "analytics" | "timeline" | "calendar" | "workflow" }
   | { type: "add_panel"; panel: "NotesPanel" }
   | { type: "remove_panel"; panel: "NotesPanel" };
 
 export const registry = {
-  currentView: "customer-list" as "customer-list" | "customer-detail" | "triage",
+  currentView: "customer-list" as "customer-list" | "customer-detail" | "triage" | "dashboard" | "analytics" | "timeline" | "calendar" | "workflow",
   layout: {
     "customer-list": ["EntityList"],
     "customer-detail": ["EntityDetail", "NotesPanel"],
     "triage": ["TriageBoard", "NotesPanel"],
+    "dashboard": ["CustomerDashboard"],
+    "analytics": ["AnalyticsView"],
+    "timeline": ["TimelineView"],
+    "calendar": ["CalendarView"],
+    "workflow": ["WorkflowView"],
   },
   constraints: {
     NotesPanel: { mustMountWithin: ["EntityDetail", "TriageBoard"] }
