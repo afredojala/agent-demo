@@ -1,0 +1,8 @@
+name: triage_and_note
+user: "Show Acme's open tickets; add a follow-up note on the oldest one; email me a summary."
+asserts:
+  - tool_called: tool_search_customers
+  - tool_called: tool_emit_view_intent
+  - tool_called: tool_list_tickets
+  - tool_called: tool_create_note
+  - tool_called: tool_send_email
