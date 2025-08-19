@@ -117,6 +117,35 @@ async def emit_intent(intent: dict):
         return {"status": "error", "message": str(e)}
 
 
+
+def tool_receive_event(event: dict):
+    """Process events received from the frontend.
+
+    Events can trigger workflows or update internal state. The payload
+    structure is expected to be a dictionary.
+    """
+
+    event_type = event.get("type")
+
+    # Workflow execution request
+    if event_type == "workflow":
+        workflow = event.get("name")
+        context = event.get("context", {})
+        if workflow:
+            return execute_workflow(workflow, context)
+        return {"status": "error", "message": "missing workflow name"}
+
+    # Persist arbitrary state
+    if event_type == "state":
+        key = event.get("key")
+        value = event.get("value", {})
+        if key:
+            return set_workflow_state(key, value)
+        return {"status": "error", "message": "missing state key"}
+
+    # Default: acknowledge receipt
+    return {"status": "received", "event": event}
+
 async def tool_add_component(component: str, component_id: str, props: dict | None = None):
     """Dynamically add a UI component by emitting an intent to the frontend."""
     intent = {
@@ -128,6 +157,7 @@ async def tool_add_component(component: str, component_id: str, props: dict | No
     return await emit_intent(intent)
 
 
+
 def get_customer_stats(metric: str):
     """Get customer analytics and statistics."""
     with httpx.Client() as client:
@@ -137,7 +167,7 @@ def get_customer_stats(metric: str):
         
         if metric == "ticket_count":
             stats = []
-            for customer in customers:
+            for customer in custom30ers:
                 tickets_response = client.get(
                     f"{API_BASE}/tickets",
                     params={"customer_id": customer["id"]},
@@ -262,7 +292,7 @@ async def create_visualization(chart_type: str, data_query: str, title: str = ""
                             "labels": [item["label"] for item in customer_data],
                             "datasets": [{
                                 "label": "Tickets",
-                                "data": [item["value"] for item in customer_data],
+                                "data": [item["value"] for item in customer_data],30
                                 "backgroundColor": [
                                     "rgba(79, 70, 229, 0.8)",
                                     "rgba(124, 58, 237, 0.8)", 
@@ -368,7 +398,7 @@ async def create_visualization(chart_type: str, data_query: str, title: str = ""
                 total_closed = 0
                 for customer in customers:
                     open_tickets = client.get(
-                        f"{API_BASE}/tickets",
+                        f"{API_BASE}/tickets",30
                         params={"customer_id": customer["id"], "status": "open"},
                         timeout=10
                     ).json()

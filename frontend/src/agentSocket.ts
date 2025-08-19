@@ -9,6 +9,14 @@ export function setForceRender(fn: () => void) {
   forceRender = fn;
 }
 
+export function sendEvent(payload: Record<string, unknown>) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "event", payload }));
+  } else {
+    console.warn("Agent WebSocket not connected");
+  }
+}
+
 function connectWebSocket() {
   try {
     ws = new WebSocket(WS_URL);
