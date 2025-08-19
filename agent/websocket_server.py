@@ -17,7 +17,25 @@ async def handle_client(websocket):
     logger.info(f"Client connected. Total clients: {len(connected_clients)}")
 
     try:
-        await websocket.wait_closed()
+        async for message in websocket:
+            try:
+                data = json.loads(message)
+            except json.JSONDecodeError:
+                logger.warning(f"Received invalid JSON: {message}")
+                continue
+
+            msg_type = data.get("type")
+            if msg_type == "event":
+                payload = data.get("payload", {})
+                try:
+                    from agent.tools import tool_receive_event
+
+                    tool_receive_event(payload)
+                except Exception as e:
+                    logger.error(f"Error dispatching event: {e}")
+            else:
+                logger.warning(f"Unknown message type: {msg_type}")
+
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:

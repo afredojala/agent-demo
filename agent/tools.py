@@ -94,6 +94,35 @@ async def emit_intent(intent: dict):
         return {"status": "error", "message": str(e)}
 
 
+def tool_receive_event(event: dict):
+    """Process events received from the frontend.
+
+    Events can trigger workflows or update internal state. The payload
+    structure is expected to be a dictionary.
+    """
+
+    event_type = event.get("type")
+
+    # Workflow execution request
+    if event_type == "workflow":
+        workflow = event.get("name")
+        context = event.get("context", {})
+        if workflow:
+            return execute_workflow(workflow, context)
+        return {"status": "error", "message": "missing workflow name"}
+
+    # Persist arbitrary state
+    if event_type == "state":
+        key = event.get("key")
+        value = event.get("value", {})
+        if key:
+            return set_workflow_state(key, value)
+        return {"status": "error", "message": "missing state key"}
+
+    # Default: acknowledge receipt
+    return {"status": "received", "event": event}
+
+
 def get_customer_stats(metric: str):
     """Get customer analytics and statistics."""
     with httpx.Client() as client:
