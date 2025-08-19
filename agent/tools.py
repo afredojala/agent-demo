@@ -4,9 +4,32 @@ import httpx
 import json
 import websockets
 import os
+from typing import Optional
 
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 AGENT_WS = os.getenv("AGENT_WS", "ws://localhost:8765")
+
+
+def start_workflow(name: str):
+    """Start a workflow run and return its metadata."""
+    with httpx.Client() as client:
+        response = client.post(
+            f"{API_BASE}/workflows", json={"name": name}, timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def record_workflow_step(run_id: int, name: str, status: str, result: Optional[str] = None):
+    """Record a step's progress for a workflow run."""
+    with httpx.Client() as client:
+        response = client.post(
+            f"{API_BASE}/workflows/{run_id}/steps",
+            json={"name": name, "status": status, "result": result},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 def search_customers(name: str = None, location: str = None, criteria: str = None):
