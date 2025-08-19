@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const WS_URL = import.meta.env.VITE_AGENT_WS || "ws://localhost:8765";
+
 interface Message {
   id: string;
   type: 'user' | 'agent' | 'system' | 'tool';
@@ -61,6 +63,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    const ws = new WebSocket(WS_URL);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'tool_call') {
+          const statusIcon = data.status === 'success' ? '✅' : '❌';
+          const logMessage: Message = {
+            id: Date.now().toString(),
+            type: 'system',
+            content: `${statusIcon} ${data.name} ${data.status}`,
+            timestamp: new Date().toISOString(),
+            toolCall: data.name,
+          };
+          setMessages(prev => [...prev, logMessage]);
+        }
+      } catch (err) {
+        console.error('Failed to parse log message', err);
+      }
+    };
+    return () => ws.close();
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
