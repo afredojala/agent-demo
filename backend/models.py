@@ -85,3 +85,32 @@ class EmailCreate(BaseModel):
     to: str
     subject: str
     body: str
+
+
+class WorkflowRun(BaseModel):
+    id: int
+    name: str
+    status: str
+    started_at: str
+    finished_at: Optional[str] = None
+    result: Optional[str] = None
+
+
+class WorkflowRunCreate(BaseModel):
+    name: str
+
+
+class WorkflowStep(BaseModel):
+    id: int
+    run_id: int
+    name: str
+    status: str
+    started_at: str
+    finished_at: Optional[str] = None
+    result: Optional[str] = None
+
+
+class WorkflowStepCreate(BaseModel):
+    name: str
+    status: str
+    result: Optional[str] = None

@@ -28,6 +28,39 @@ def db():
     return conn
 
 
+def init_workflow_tables():
+    conn = db()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workflow_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            status TEXT,
+            started_at TEXT,
+            finished_at TEXT,
+            result TEXT
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workflow_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id INTEGER REFERENCES workflow_runs(id),
+            name TEXT,
+            status TEXT,
+            started_at TEXT,
+            finished_at TEXT,
+            result TEXT
+        )
+        """
+    )
+    conn.commit()
+
+
+init_workflow_tables()
+
+
 class Customer(BaseModel):
     id: str
     name: str
@@ -69,9 +102,91 @@ class ChatResponse(BaseModel):
     view_change: Optional[str] = None
 
 
+class WorkflowStart(BaseModel):
+    name: str
+
+
+class WorkflowRun(BaseModel):
+    id: int
+    name: str
+    status: str
+    started_at: str
+    finished_at: Optional[str] = None
+    result: Optional[str] = None
+
+
+class WorkflowStepIn(BaseModel):
+    name: str
+    status: str
+    result: Optional[str] = None
+
+
+class WorkflowStep(BaseModel):
+    id: int
+    run_id: int
+    name: str
+    status: str
+    started_at: str
+    finished_at: Optional[str] = None
+    result: Optional[str] = None
+
+
 def rows(conn, q, args=()):
     cur = conn.execute(q, args)
     return [dict(r) for r in cur.fetchall()]
+
+
+@app.post("/workflows", response_model=WorkflowRun)
+def start_workflow(payload: WorkflowStart):
+    conn = db()
+    cur = conn.execute(
+        "INSERT INTO workflow_runs(name, status, started_at) VALUES(?, 'running', strftime('%Y-%m-%dT%H:%M:%SZ','now'))",
+        (payload.name,),
+    )
+    conn.commit()
+    run_id = cur.lastrowid
+    (run,) = rows(conn, "SELECT * FROM workflow_runs WHERE id=?", (run_id,))
+    return run
+
+
+@app.post("/workflows/{run_id}/steps", response_model=WorkflowStep)
+def add_workflow_step(run_id: int, step: WorkflowStepIn):
+    conn = db()
+    cur = conn.execute(
+        "INSERT INTO workflow_steps(run_id, name, status, started_at, finished_at, result) VALUES(?,?,?,strftime('%Y-%m-%dT%H:%M:%SZ','now'), CASE WHEN ? IN ('completed','failed') THEN strftime('%Y-%m-%dT%H:%M:%SZ','now') END, ?)",
+        (run_id, step.name, step.status, step.status, step.result),
+    )
+    if step.status in ("completed", "failed"):
+        conn.execute(
+            "UPDATE workflow_runs SET status=?, finished_at=strftime('%Y-%m-%dT%H:%M:%SZ','now'), result=? WHERE id=?",
+            (step.status, step.result, run_id),
+        )
+    conn.commit()
+    step_id = cur.lastrowid
+    (row,) = rows(conn, "SELECT * FROM workflow_steps WHERE id=?", (step_id,))
+    return row
+
+
+@app.get("/workflows/{run_id}")
+def get_workflow(run_id: int):
+    conn = db()
+    runs = rows(conn, "SELECT * FROM workflow_runs WHERE id=?", (run_id,))
+    if not runs:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    run = runs[0]
+    steps = rows(conn, "SELECT * FROM workflow_steps WHERE run_id=? ORDER BY id", (run_id,))
+    run["steps"] = steps
+    return run
+
+
+@app.get("/workflows", response_model=List[WorkflowRun])
+def list_workflows(limit: int = 20):
+    conn = db()
+    return rows(
+        conn,
+        "SELECT * FROM workflow_runs ORDER BY started_at DESC LIMIT ?",
+        (limit,),
+    )
 
 
 @app.get("/customers", response_model=List[Customer])
