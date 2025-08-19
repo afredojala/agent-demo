@@ -166,6 +166,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
     { text: "Find high activity customers", color: 'orange', icon: '🔥' },
     { text: "Show customer health report", color: 'teal', icon: '💚' },
     { text: "Close resolved tickets", color: 'gray', icon: '✅' },
+    // Dynamic Chart Actions
+    { text: "Create a bar chart of customer activity", color: 'cyan', icon: '📊', special: true, chart: true },
+    { text: "Show me a pie chart of ticket status", color: 'indigo', icon: '🥧', special: true, chart: true },
+    { text: "Visualize ticket trends over time", color: 'emerald', icon: '📈', special: true, chart: true },
+    // Workflows
     { text: "Onboard TechCorp as a new customer", color: 'purple', icon: '🚀', special: true },
     { text: "Run ticket escalation workflow", color: 'red', icon: '🚨', special: true },
     { text: "Generate weekly business report", color: 'blue', icon: '📊', special: true },
@@ -310,9 +315,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onViewChange }) => {
               whileTap={{ scale: 0.95 }}
               onClick={() => setInput(action.text)}
               className={`px-3 py-1.5 rounded-lg text-xs transition-all duration-200 ${
-                action.special 
-                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30 text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30'
-                  : 'bg-white/5 border border-white/20 text-gray-300 hover:bg-white/10'
+                action.chart
+                  ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-400/30 text-cyan-300 hover:from-cyan-500/30 hover:to-blue-500/30'
+                  : action.special 
+                    ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30 text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30'
+                    : 'bg-white/5 border border-white/20 text-gray-300 hover:bg-white/10'
               } backdrop-blur-sm`}
             >
               <span className="mr-1">{action.icon}</span>

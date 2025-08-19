@@ -11,6 +11,8 @@ import {
   Legend,
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
+import ChartRenderer from '../components/ChartRenderer';
+import { registry } from '../registry';
 
 ChartJS.register(
   CategoryScale,
@@ -221,6 +223,9 @@ const AnalyticsView: React.FC = () => {
     }
   };
 
+  // Check for dynamic charts
+  const dynamicChart = registry.charts['dynamic-chart'];
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -235,6 +240,22 @@ const AnalyticsView: React.FC = () => {
         <h2 className="text-3xl font-bold gradient-text mb-2">Analytics & Reports</h2>
         <p className="text-gray-300 text-sm">Real-time insights and performance metrics</p>
       </motion.div>
+
+      {/* Dynamic Chart Section */}
+      {dynamicChart && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <ChartRenderer
+            chartConfig={dynamicChart.chartConfig}
+            title={dynamicChart.title}
+            description={dynamicChart.description}
+            containerId="dynamic-chart"
+          />
+        </motion.div>
+      )}
       
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

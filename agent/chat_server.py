@@ -27,7 +27,7 @@ async def process_message(request: ChatRequest) -> ChatResponse:
     """Process a chat message and execute the corresponding task."""
     try:
         # Run the task using the agent
-        result = run_task(request.message)
+        result = await run_task(request.message)
 
         # Determine view change based on message content and agent response
         view_change = None

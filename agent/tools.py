@@ -191,6 +191,275 @@ def bulk_update_tickets(operation: str, criteria: str = "", new_status: str = ""
         }
 
 
+async def create_visualization(chart_type: str, data_query: str, title: str = "", description: str = ""):
+    """Create dynamic visualizations based on user queries."""
+    with httpx.Client() as client:
+        # Determine what data to fetch based on the query
+        chart_data = None
+        chart_config = None
+        
+        try:
+            if "customer" in data_query.lower() and ("ticket" in data_query.lower() or "activity" in data_query.lower()):
+                # Customer activity/ticket data
+                customers_response = client.get(f"{API_BASE}/customers", timeout=10)
+                customers = customers_response.json()
+                
+                customer_data = []
+                for customer in customers[:8]:  # Top 8 for readability
+                    tickets_response = client.get(
+                        f"{API_BASE}/tickets",
+                        params={"customer_id": customer["id"]},
+                        timeout=10
+                    )
+                    ticket_count = len(tickets_response.json())
+                    customer_data.append({
+                        "label": customer["name"].split()[0],  # First name only
+                        "value": ticket_count,
+                        "fullName": customer["name"]
+                    })
+                
+                # Sort by value (ticket count)
+                customer_data.sort(key=lambda x: x["value"], reverse=True)
+                
+                if chart_type in ["bar", "column"]:
+                    chart_config = {
+                        "type": "bar",
+                        "data": {
+                            "labels": [item["label"] for item in customer_data],
+                            "datasets": [{
+                                "label": "Tickets",
+                                "data": [item["value"] for item in customer_data],
+                                "backgroundColor": [
+                                    "rgba(79, 70, 229, 0.8)",
+                                    "rgba(124, 58, 237, 0.8)", 
+                                    "rgba(236, 72, 153, 0.8)",
+                                    "rgba(34, 197, 94, 0.8)",
+                                    "rgba(249, 115, 22, 0.8)",
+                                    "rgba(59, 130, 246, 0.8)",
+                                    "rgba(168, 85, 247, 0.8)",
+                                    "rgba(244, 63, 94, 0.8)"
+                                ],
+                                "borderColor": [
+                                    "rgba(79, 70, 229, 1)",
+                                    "rgba(124, 58, 237, 1)", 
+                                    "rgba(236, 72, 153, 1)",
+                                    "rgba(34, 197, 94, 1)",
+                                    "rgba(249, 115, 22, 1)",
+                                    "rgba(59, 130, 246, 1)",
+                                    "rgba(168, 85, 247, 1)",
+                                    "rgba(244, 63, 94, 1)"
+                                ],
+                                "borderWidth": 2,
+                                "borderRadius": 8
+                            }]
+                        },
+                        "options": {
+                            "responsive": True,
+                            "plugins": {
+                                "title": {
+                                    "display": True,
+                                    "text": title or "Customer Activity",
+                                    "color": "#f1f5f9",
+                                    "font": {"size": 16}
+                                },
+                                "legend": {
+                                    "labels": {
+                                        "color": "#f1f5f9"
+                                    }
+                                }
+                            },
+                            "scales": {
+                                "y": {
+                                    "ticks": {"color": "#94a3b8"},
+                                    "grid": {"color": "rgba(148, 163, 184, 0.1)"}
+                                },
+                                "x": {
+                                    "ticks": {"color": "#94a3b8"},
+                                    "grid": {"color": "rgba(148, 163, 184, 0.1)"}
+                                }
+                            }
+                        }
+                    }
+                    
+                elif chart_type in ["pie", "doughnut"]:
+                    chart_config = {
+                        "type": "doughnut",
+                        "data": {
+                            "labels": [item["label"] for item in customer_data[:6]],  # Top 6 for pie
+                            "datasets": [{
+                                "data": [item["value"] for item in customer_data[:6]],
+                                "backgroundColor": [
+                                    "rgba(79, 70, 229, 0.8)",
+                                    "rgba(124, 58, 237, 0.8)", 
+                                    "rgba(236, 72, 153, 0.8)",
+                                    "rgba(34, 197, 94, 0.8)",
+                                    "rgba(249, 115, 22, 0.8)",
+                                    "rgba(59, 130, 246, 0.8)"
+                                ],
+                                "borderColor": [
+                                    "rgba(79, 70, 229, 1)",
+                                    "rgba(124, 58, 237, 1)", 
+                                    "rgba(236, 72, 153, 1)",
+                                    "rgba(34, 197, 94, 1)",
+                                    "rgba(249, 115, 22, 1)",
+                                    "rgba(59, 130, 246, 1)"
+                                ],
+                                "borderWidth": 2
+                            }]
+                        },
+                        "options": {
+                            "responsive": True,
+                            "plugins": {
+                                "title": {
+                                    "display": True,
+                                    "text": title or "Customer Distribution",
+                                    "color": "#f1f5f9",
+                                    "font": {"size": 16}
+                                },
+                                "legend": {
+                                    "labels": {
+                                        "color": "#f1f5f9"
+                                    }
+                                }
+                            }
+                        }
+                    }
+            
+            elif "ticket" in data_query.lower() and ("status" in data_query.lower() or "resolution" in data_query.lower()):
+                # Ticket status/resolution data
+                customers_response = client.get(f"{API_BASE}/customers", timeout=10)
+                customers = customers_response.json()
+                
+                total_open = 0
+                total_closed = 0
+                for customer in customers:
+                    open_tickets = client.get(
+                        f"{API_BASE}/tickets",
+                        params={"customer_id": customer["id"], "status": "open"},
+                        timeout=10
+                    ).json()
+                    closed_tickets = client.get(
+                        f"{API_BASE}/tickets", 
+                        params={"customer_id": customer["id"], "status": "closed"},
+                        timeout=10
+                    ).json()
+                    total_open += len(open_tickets)
+                    total_closed += len(closed_tickets)
+                
+                chart_config = {
+                    "type": "doughnut",
+                    "data": {
+                        "labels": ["Open Tickets", "Closed Tickets"],
+                        "datasets": [{
+                            "data": [total_open, total_closed],
+                            "backgroundColor": [
+                                "rgba(249, 115, 22, 0.8)",
+                                "rgba(34, 197, 94, 0.8)"
+                            ],
+                            "borderColor": [
+                                "rgba(249, 115, 22, 1)",
+                                "rgba(34, 197, 94, 1)"
+                            ],
+                            "borderWidth": 2
+                        }]
+                    },
+                    "options": {
+                        "responsive": True,
+                        "plugins": {
+                            "title": {
+                                "display": True,
+                                "text": title or "Ticket Status Distribution",
+                                "color": "#f1f5f9",
+                                "font": {"size": 16}
+                            },
+                            "legend": {
+                                "labels": {
+                                    "color": "#f1f5f9"
+                                }
+                            }
+                        }
+                    }
+                }
+            
+            elif "trend" in data_query.lower() or "time" in data_query.lower():
+                # Mock time-series data for trends
+                months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
+                ticket_data = [12, 19, 15, 22, 18, 25]  # Mock trend data
+                
+                chart_config = {
+                    "type": "line",
+                    "data": {
+                        "labels": months,
+                        "datasets": [{
+                            "label": "Tickets Created",
+                            "data": ticket_data,
+                            "borderColor": "rgba(79, 70, 229, 1)",
+                            "backgroundColor": "rgba(79, 70, 229, 0.1)",
+                            "borderWidth": 3,
+                            "fill": True,
+                            "tension": 0.4
+                        }]
+                    },
+                    "options": {
+                        "responsive": True,
+                        "plugins": {
+                            "title": {
+                                "display": True,
+                                "text": title or "Ticket Trends Over Time",
+                                "color": "#f1f5f9",
+                                "font": {"size": 16}
+                            },
+                            "legend": {
+                                "labels": {
+                                    "color": "#f1f5f9"
+                                }
+                            }
+                        },
+                        "scales": {
+                            "y": {
+                                "ticks": {"color": "#94a3b8"},
+                                "grid": {"color": "rgba(148, 163, 184, 0.1)"}
+                            },
+                            "x": {
+                                "ticks": {"color": "#94a3b8"},
+                                "grid": {"color": "rgba(148, 163, 184, 0.1)"}
+                            }
+                        }
+                    }
+                }
+            
+            else:
+                # Default: customer ticket counts
+                return await create_visualization("bar", "customer ticket activity", title, description)
+            
+            # Send chart via WebSocket
+            intent = {
+                "type": "render_chart",
+                "chartConfig": chart_config,
+                "containerId": "dynamic-chart",
+                "title": title,
+                "description": description
+            }
+            
+            result = await emit_intent(intent)
+            
+            return {
+                "status": "success",
+                "chart_type": chart_type,
+                "data_query": data_query,
+                "title": title,
+                "intent_result": result
+            }
+            
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to create visualization: {str(e)}",
+                "chart_type": chart_type,
+                "data_query": data_query
+            }
+
+
 def generate_report(report_type: str, date_range: str = ""):
     """Generate various types of reports using comprehensive analytics."""
     with httpx.Client() as client:

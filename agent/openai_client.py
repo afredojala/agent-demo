@@ -272,4 +272,34 @@ tools = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_create_visualization",
+            "description": "Create dynamic charts and visualizations based on user queries. Use this when the user asks for charts, graphs, trends, or visual data representation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chart_type": {
+                        "type": "string",
+                        "enum": ["bar", "line", "pie", "doughnut", "column"],
+                        "description": "Type of chart to create"
+                    },
+                    "data_query": {
+                        "type": "string", 
+                        "description": "Describes what data to visualize (e.g., 'customer ticket activity', 'ticket status distribution', 'trends over time')"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Title for the chart"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Brief description of what the chart shows"
+                    }
+                },
+                "required": ["chart_type", "data_query"],
+            },
+        },
+    },
 ]
