@@ -13,6 +13,7 @@ import CalendarView from "./views/CalendarView";
 import WorkflowView from "./views/WorkflowView";
 import NotesPanel from "./panels/NotesPanel";
 import ChatInterface from "./components/ChatInterface";
+import { ComponentFactory } from "./components/ComponentFactory";
 import "./index.css";
 
 function App() {
@@ -166,6 +167,9 @@ function App() {
                       <NotesPanel />
                     </motion.div>
                   )}
+                  {Object.entries(registry.components).map(([id, cfg]) => (
+                    <ComponentFactory key={id} component={cfg.component} props={cfg.props} />
+                  ))}
                 </motion.div>
               </AnimatePresence>
             </div>
