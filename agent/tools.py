@@ -94,6 +94,17 @@ async def emit_intent(intent: dict):
         return {"status": "error", "message": str(e)}
 
 
+async def tool_add_component(component: str, component_id: str, props: dict | None = None):
+    """Dynamically add a UI component by emitting an intent to the frontend."""
+    intent = {
+        "type": "add_component",
+        "id": component_id,
+        "component": component,
+        "props": props or {},
+    }
+    return await emit_intent(intent)
+
+
 def get_customer_stats(metric: str):
     """Get customer analytics and statistics."""
     with httpx.Client() as client:
