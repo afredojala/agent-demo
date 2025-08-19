@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import WorkflowProgress from '../components/WorkflowProgress';
 
+const WS_URL = import.meta.env.VITE_AGENT_WS || "ws://localhost:8765";
+
 interface WorkflowExecution {
   id: string;
   name: string;
@@ -21,48 +23,50 @@ const WorkflowView: React.FC = () => {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null);
 
   useEffect(() => {
-    // Mock workflow data - in real app this would come from WebSocket or API
-    const mockWorkflows: WorkflowExecution[] = [
-      {
-        id: 'wf_1',
-        name: 'customer_onboarding',
-        status: 'completed',
-        currentStep: 4,
-        startTime: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
-        steps: [
-          { step: '✓ Created customer record for TechCorp Inc', status: 'completed', timestamp: '5 min ago' },
-          { step: '✓ Identified as premium customer: Enterprise email domain', status: 'completed', timestamp: '5 min ago' },
-          { step: '✓ Scheduled premium welcome call within 24 hours', status: 'completed', timestamp: '4 min ago' },
-          { step: '✓ Created premium onboarding ticket', status: 'completed', timestamp: '4 min ago' },
-          { step: '✓ Scheduled 7-day health check', status: 'completed', timestamp: '4 min ago' }
-        ],
-        result: {
-          workflow: 'customer_onboarding',
-          status: 'completed',
-          path: 'premium'
-        }
-      },
-      {
-        id: 'wf_2', 
-        name: 'ticket_escalation',
-        status: 'completed',
-        currentStep: 3,
-        startTime: new Date(Date.now() - 120000).toISOString(), // 2 minutes ago
-        steps: [
-          { step: '✓ Retrieved customer ticket data', status: 'completed', timestamp: '2 min ago' },
-          { step: '🚨 Escalated ticket for Acme Corp: SLA breach risk detected', status: 'completed', timestamp: '2 min ago' },
-          { step: '⚠️ Monitoring ticket for Global Solutions: Approaching SLA limit', status: 'completed', timestamp: '2 min ago' },
-          { step: '✓ Sent escalation summary to management', status: 'completed', timestamp: '1 min ago' }
-        ],
-        result: {
-          workflow: 'ticket_escalation',
-          escalated_count: 1,
-          monitored_count: 1
-        }
-      }
-    ];
+    const ws = new WebSocket(WS_URL);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'tool_call' && data.result && data.result.workflow) {
+          const wfName = data.result.workflow;
+          const steps = (data.result.steps || []).map((s: string) => ({
+            step: s,
+            status: 'completed' as const,
+            timestamp: new Date().toLocaleTimeString(),
+          }));
 
-    setWorkflows(mockWorkflows);
+          setWorkflows(prev => {
+            const existingIndex = prev.findIndex(w => w.name === wfName);
+            if (existingIndex !== -1) {
+              const updated = [...prev];
+              const existing = updated[existingIndex];
+              updated[existingIndex] = {
+                ...existing,
+                status: data.result.status || existing.status,
+                steps,
+                currentStep: steps.length,
+                result: data.result,
+              };
+              return updated;
+            }
+
+            const newWorkflow: WorkflowExecution = {
+              id: `${wfName}_${Date.now()}`,
+              name: wfName,
+              status: data.result.status || 'running',
+              steps,
+              currentStep: steps.length,
+              startTime: new Date().toISOString(),
+              result: data.result,
+            };
+            return [...prev, newWorkflow];
+          });
+        }
+      } catch (err) {
+        console.error('Failed to parse workflow log', err);
+      }
+    };
+    return () => ws.close();
   }, []);
 
   const getWorkflowSummary = (workflow: WorkflowExecution) => {

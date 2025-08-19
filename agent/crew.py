@@ -4,6 +4,7 @@ import json
 import asyncio
 import sys
 import os
+import websockets
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -27,6 +28,18 @@ from agent.tools import (
     assign_ticket,
     create_visualization,
 )
+
+
+AGENT_WS = os.getenv("AGENT_WS", "ws://localhost:8765")
+
+
+async def emit_log(log: dict):
+    """Send structured log events to the frontend via WebSocket."""
+    try:
+        async with websockets.connect(AGENT_WS) as ws:
+            await ws.send(json.dumps(log))
+    except Exception as e:
+        print(f"Failed to emit log: {e}")
 
 
 
@@ -155,6 +168,14 @@ Always start by setting an appropriate view, then execute the requested task. Fo
 
                     try:
                         tool_result = await call_tool(tool_name, args)
+                        await emit_log(
+                            {
+                                "type": "tool_call",
+                                "name": tool_name,
+                                "status": "success",
+                                "result": tool_result,
+                            }
+                        )
                         messages.append(
                             {
                                 "role": "tool",
@@ -163,6 +184,14 @@ Always start by setting an appropriate view, then execute the requested task. Fo
                             }
                         )
                     except Exception as e:
+                        await emit_log(
+                            {
+                                "type": "tool_call",
+                                "name": tool_name,
+                                "status": "error",
+                                "error": str(e),
+                            }
+                        )
                         messages.append(
                             {
                                 "role": "tool",

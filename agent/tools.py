@@ -4,9 +4,32 @@ import httpx
 import json
 import websockets
 import os
+from typing import Optional
 
 API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 AGENT_WS = os.getenv("AGENT_WS", "ws://localhost:8765")
+
+
+def start_workflow(name: str):
+    """Start a workflow run and return its metadata."""
+    with httpx.Client() as client:
+        response = client.post(
+            f"{API_BASE}/workflows", json={"name": name}, timeout=10
+        )
+        response.raise_for_status()
+        return response.json()
+
+
+def record_workflow_step(run_id: int, name: str, status: str, result: Optional[str] = None):
+    """Record a step's progress for a workflow run."""
+    with httpx.Client() as client:
+        response = client.post(
+            f"{API_BASE}/workflows/{run_id}/steps",
+            json={"name": name, "status": status, "result": result},
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 def search_customers(name: str = None, location: str = None, criteria: str = None):
@@ -94,6 +117,7 @@ async def emit_intent(intent: dict):
         return {"status": "error", "message": str(e)}
 
 
+
 def tool_receive_event(event: dict):
     """Process events received from the frontend.
 
@@ -122,6 +146,17 @@ def tool_receive_event(event: dict):
     # Default: acknowledge receipt
     return {"status": "received", "event": event}
 
+async def tool_add_component(component: str, component_id: str, props: dict | None = None):
+    """Dynamically add a UI component by emitting an intent to the frontend."""
+    intent = {
+        "type": "add_component",
+        "id": component_id,
+        "component": component,
+        "props": props or {},
+    }
+    return await emit_intent(intent)
+
+
 
 def get_customer_stats(metric: str):
     """Get customer analytics and statistics."""
@@ -132,7 +167,7 @@ def get_customer_stats(metric: str):
         
         if metric == "ticket_count":
             stats = []
-            for customer in customers:
+            for customer in custom30ers:
                 tickets_response = client.get(
                     f"{API_BASE}/tickets",
                     params={"customer_id": customer["id"]},
@@ -257,7 +292,7 @@ async def create_visualization(chart_type: str, data_query: str, title: str = ""
                             "labels": [item["label"] for item in customer_data],
                             "datasets": [{
                                 "label": "Tickets",
-                                "data": [item["value"] for item in customer_data],
+                                "data": [item["value"] for item in customer_data],30
                                 "backgroundColor": [
                                     "rgba(79, 70, 229, 0.8)",
                                     "rgba(124, 58, 237, 0.8)", 
@@ -363,7 +398,7 @@ async def create_visualization(chart_type: str, data_query: str, title: str = ""
                 total_closed = 0
                 for customer in customers:
                     open_tickets = client.get(
-                        f"{API_BASE}/tickets",
+                        f"{API_BASE}/tickets",30
                         params={"customer_id": customer["id"], "status": "open"},
                         timeout=10
                     ).json()
